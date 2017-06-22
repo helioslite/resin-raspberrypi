@@ -5,8 +5,8 @@
 #MACHINE ?= "raspberrypi3-64"
 
 # More info meta-resin/README.md
-#RESIN_CONNECTABLE ?= "1"
-#RESIN_CONNECTABLE_ENABLE_SERVICES ?= "0"
+RESIN_CONNECTABLE ?= "0"
+RESIN_CONNECTABLE_ENABLE_SERVICES ?= "0"
 #TARGET_REPOSITORY ?= ""
 #TARGET_TAG ?= ""
 
@@ -17,7 +17,7 @@ GPU_MEM = "16"
 #DEVELOPMENT_IMAGE = "1"
 
 # Set this to make build system generate resinhup bundles
-#RESINHUP ?= "yes"
+RESINHUP ?= "yes"
 
 # Set this to change the supervisor tag used
 #TARGET_TAG ?= "master"

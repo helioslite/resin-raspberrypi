@@ -1,0 +1,67 @@
+#!/bin/bash
+set -e
+
+source /usr/sbin/resin-vars
+UUID=$(jq --raw-output '.uuid // empty' $CONFIG_PATH)
+RSM_SSH_HOST=$(jq --raw-output '.rsmSshHost // empty' $CONFIG_PATH)
+RSM_SSH_PORT=$(jq --raw-output '.rsmSshPort // "22"' $CONFIG_PATH)
+RSM_SSH_KEY=$(jq --raw-output '.rsmSshKey // empty' $CONFIG_PATH)
+
+if [ -z "$UUID" -o -z "$RSM_SSH_HOST" -o -z "$RSM_SSH_PORT" -o -z "$RSM_SSH_KEY" ]; then
+    echo "[ERROR] $0 : Can't run because of missing variables from $CONFIG_PATH"
+    exit 0
+fi
+
+RSM_SSH_KEY_DIR="/tmp/.ssh_rsm"
+RSM_SSH_KEY_PATH="${RSM_SSH_KEY_DIR}/id_rsa"
+if [ ! -f "$RSM_SSH_KEY_PATH" ]; then
+    mkdir -p "$RSM_SSH_KEY_DIR"
+    chmod 0700 "$RSM_SSH_KEY_DIR"
+    echo "$RSM_SSH_KEY" | jq --raw-output '.[]' > "$RSM_SSH_KEY_PATH"
+    dropbearconvert openssh dropbear "$RSM_SSH_KEY_PATH" "${RSM_SSH_KEY_PATH}_dropbear"
+    chmod 0600 "$RSM_SSH_KEY_PATH" "${RSM_SSH_KEY_PATH}_dropbear"
+fi
+
+SSH_ARGS="-i ${RSM_SSH_KEY_PATH}_dropbear -p $RSM_SSH_PORT"
+SSH_ARGS="$SSH_ARGS -y -y" # Don't perform any remote host key checking (caution)
+SSH_ARGS="$SSH_ARGS -K 30" # Keepalive interval in seconds
+SSH_ARGS="$SSH_ARGS -o ExitOnForwardFailure=yes"
+
+json=$(ssh $SSH_ARGS rsm@$RSM_SSH_HOST check $UUID $CONFIG_HOSTNAME)
+if [ $? -ne 0 ]
+then
+    echo "[ERROR] $0 : Can't retrieve remote data for ${CONFIG_HOSTNAME}[${UUID}]"
+    echo "$json"
+    exit 0
+fi
+
+# validate json
+if ! echo "$json" | jq . > /dev/null ; then
+    echo "[ERROR] $0 : Can't parse json data for ${CONFIG_HOSTNAME}[${UUID}]"
+    echo "$json"
+    exit 0
+fi
+data="$(echo $json | jq -r .data)"
+active="$(echo $json | jq .active)"
+port="$(echo $json | jq .port)"
+listen="$(echo $json | jq .listen)"
+
+data="${data%<br>}"
+[ "$data" == "null" ] && data=""
+if [ -n "$data" ]
+then
+    # TODO: validate data is an allowed command
+    echo "Run command: '$data'"
+    bash -c "$data"
+fi
+
+if [ "$active" == "true" ]
+then
+    if [ "$listen" == "true" ]
+    then
+        echo "Reverse tunnel for ${CONFIG_HOSTNAME}[${UUID}] is already open on port $port"
+        exit 0
+    fi
+    echo "Opening reverse tunnel for ${CONFIG_HOSTNAME}[${UUID}] on port $port"
+    ssh $SSH_ARGS -f -R ${port}:localhost:22222 rsm@${RSM_SSH_HOST} sleep
+fi

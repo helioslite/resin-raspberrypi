@@ -1,0 +1,28 @@
+#!/bin/sh -e
+
+source /usr/sbin/resin-vars
+
+SUPERVISOR_IMAGE_ID=$(docker inspect --format='{{.Id}}' $SUPERVISOR_IMAGE)
+SUPERVISOR_CONTAINER_IMAGE_ID=$(docker inspect --format='{{.Image}}' resin_supervisor || echo "")
+
+runSupervisor() {
+    docker rm --force resin_supervisor || true
+    docker run --privileged --name resin_supervisor \
+        --net=host \
+        -v /var/run/hl-hc.sock:/var/run/hl-hc.sock \
+        -v /var/run/dbus/system_bus_socket:/var/run/dbus/host_system_bus_socket \
+        -v $CONFIG_PATH:/boot/config.json \
+        -v /mnt/boot/device-type.json:/boot/device-type.json \
+        -v /resin-data:/data \
+        -v /var/log/supervisor-log:/var/log \
+        -e SUPERVISOR_IMAGE=${SUPERVISOR_IMAGE} \
+        -e SUPERVISOR_TAG=${SUPERVISOR_TAG} \
+        -e CONFIG_PATH=/boot/config.json \
+        -e DEVICE_TYPE_PATH=/boot/device-type.json \
+        -e HL_HC_SOCKET_PATH=/var/run/hl-hc.sock \
+        -e HOST_DBUS_SOCKET_PATH=/var/run/dbus/host_system_bus_socket \
+        -e RESIN_DATA_PATH=/data \
+        ${SUPERVISOR_IMAGE}
+}
+
+([ "$SUPERVISOR_IMAGE_ID" == "$SUPERVISOR_CONTAINER_IMAGE_ID" ] && docker start --attach resin_supervisor) || runSupervisor

@@ -1,0 +1,9 @@
+[Unit]
+Description=RSM client check timer
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=7min
+
+[Install]
+WantedBy=resin.target
