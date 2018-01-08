@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+source /usr/sbin/resin-vars
+
+if [ ! -z "$SSH_AUTHORIZED_KEYS" ]; then
+    echo "$SSH_AUTHORIZED_KEYS" | jq --raw-output '.[]' > /home/root/.ssh/authorized_keys
+    chmod 0600 /home/root/.ssh/authorized_keys
+fi

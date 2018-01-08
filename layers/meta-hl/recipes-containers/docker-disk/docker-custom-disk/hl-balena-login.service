@@ -1,0 +1,19 @@
+﻿[Unit]
+Description=Balena login custom registry
+Requires=\
+    balena.service \
+    resin-device-uuid.service \
+    mnt-boot.mount
+After=\
+    balena.service \
+    resin-device-uuid.service \
+    mnt-boot.mount
+Before=resin-supervisor.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@BASE_BINDIR@/bash @BINDIR@/hl-balena-login
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Resin supervisor updater
+Requires=\
+    balena.service \
+    etc-resin\x2dsupervisor.mount \
+    tmp.mount
+Wants=\
+    mnt-boot.mount \
+    resin-supervisor.service
+After=\
+    balena.service \
+    tmp.mount \
+    mnt-boot.mount \
+    etc-resin\x2dsupervisor.mount \
+    resin-supervisor.service
+
+[Service]
+Type=simple
+ExecStart=@BASE_BINDIR@/bash @BINDIR@/update-resin-supervisor

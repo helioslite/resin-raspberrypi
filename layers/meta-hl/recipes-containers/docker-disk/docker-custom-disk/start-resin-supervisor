@@ -1,0 +1,38 @@
+#!/bin/sh
+
+source /usr/sbin/resin-vars
+
+SUPERVISOR_IMAGE_ID=$(balena inspect --format='{{.Id}}' $SUPERVISOR_IMAGE:$SUPERVISOR_TAG)
+SUPERVISOR_CONTAINER_IMAGE_ID=$(balena inspect --format='{{.Image}}' resin_supervisor || echo "")
+
+runSupervisor() {
+    balena rm --force resin_supervisor || true
+    balena run --privileged --name resin_supervisor \
+        --tty --net=host \
+        -v /var/run/balena.sock:/var/run/balena.sock \
+        -v $CONFIG_PATH:/boot/config.json \
+        -v /mnt/boot/device-type.json:/boot/device-type.json \
+        -v /var/run/hl-hc.sock:/host/run/hl-hc.sock \
+        -v /var/run/dbus/system_bus_socket:/host/run/dbus/system_bus_socket \
+        -v /resin-data:/data \
+        -v /var/log/supervisor-log:/var/log \
+        -e CONFIG_PATH=/boot/config.json \
+        -e DEVICE_TYPE_PATH=/boot/device-type.json \
+        -e HOST_HL_HC_SOCKET_PATH=/host/run/hl-hc.sock \
+        -e HOST_DBUS_SOCKET_PATH=/host/run/dbus/system_bus_socket \
+        -e RESIN_DATA_PATH=/data \
+        -e LED_FILE=${LED_FILE} \
+        -e SUPERVISOR_IMAGE=${SUPERVISOR_IMAGE}:${SUPERVISOR_TAG} \
+        ${SUPERVISOR_IMAGE}:${SUPERVISOR_TAG}
+}
+
+if [ -z "$SUPERVISOR_IMAGE_ID" ]; then
+    # No supervisor image exists on the device, try to pull it
+    systemctl start update-resin-supervisor
+elif [ "$SUPERVISOR_IMAGE_ID" = "$SUPERVISOR_CONTAINER_IMAGE_ID" ]; then
+    # Supervisor image exists, and the current supervisor container is created from
+    balena start --attach resin_supervisor
+else
+    # No supervisor container exists or there's a different supervisor image to run
+    runSupervisor
+fi

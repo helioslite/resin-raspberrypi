@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+source /usr/sbin/resin-vars
+
+if [ ! -z "$PRIVATE_REGISTRY" ] \
+    && [ ! -z "$PRIVATE_REGISTRY_PASSWORD" ] \
+    && [ ! -z "$CONFIG_HOSTNAME" ]
+then
+    balena login -u "$CONFIG_HOSTNAME" -p "$PRIVATE_REGISTRY_PASSWORD" "$PRIVATE_REGISTRY"
+fi

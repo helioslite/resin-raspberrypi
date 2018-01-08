@@ -1,0 +1,113 @@
+
+FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
+
+# Resin supervisor supported CPU archtectures
+#SUPERVISOR_REPOSITORY_armv5 ?= "registry.helioslite.net/helioslite/armel-supervisor"
+SUPERVISOR_REPOSITORY_armv6 ?= "registry.helioslite.net/helioslite/armv6hf-supervisor"
+SUPERVISOR_REPOSITORY_armv7a ?= "registry.helioslite.net/helioslite/armv7hf-supervisor"
+SUPERVISOR_REPOSITORY_armv7ve ?= "registry.helioslite.net/helioslite/armv7hf-supervisor"
+#SUPERVISOR_REPOSITORY_aarch64 ?= "registry.helioslite.net/helioslite/aarch64-supervisor"
+#SUPERVISOR_REPOSITORY_x86 ?= "registry.helioslite.net/helioslite/i386-supervisor"
+SUPERVISOR_REPOSITORY_x86-64 ?= "registry.helioslite.net/helioslite/amd64-supervisor"
+#SUPERVISOR_REPOSITORY_intel-quark ?= "registry.helioslite.net/helioslite/i386-nlp-supervisor"
+
+SUPERVISOR_TAG ?= "0.12"
+TARGET_REPOSITORY = "${SUPERVISOR_REPOSITORY}"
+TARGET_TAG = "${SUPERVISOR_TAG}"
+LED_FILE ?= "/dev/null"
+
+inherit systemd
+SYSTEMD_AUTO_ENABLE = "enable"
+
+SRC_URI += " \
+    file://resin-data.mount \
+    file://start-resin-supervisor \
+    file://supervisor.conf \
+    file://resin-supervisor.service \
+    file://update-resin-supervisor \
+    file://update-resin-supervisor.service \
+    file://resin-supervisor-healthcheck \
+    file://hl-balena-login \
+    file://hl-balena-login.service \
+    "
+
+SYSTEMD_SERVICE_${PN} = " \
+    resin-supervisor.service \
+    update-resin-supervisor.service \
+    hl-balena-login.service \
+    "
+
+FILES_${PN} += " \
+    /resin-data \
+    ${systemd_unitdir} \
+    ${sysconfdir} \
+    /usr/lib/resin-supervisor \
+    "
+
+RDEPENDS_${PN} = " \
+    bash \
+    balena \
+    coreutils \
+    healthdog \
+    resin-vars \
+    systemd \
+    curl \
+    resin-unique-key \
+    "
+
+python () {
+    target_repository = d.getVar('TARGET_REPOSITORY', True)
+    supervisor_repository = d.getVar('SUPERVISOR_REPOSITORY', True)
+    tag_repository = d.getVar('TARGET_TAG', True)
+
+    if not supervisor_repository:
+        bb.fatal("resin-custom-disk: There is no support for this architecture.")
+
+    # Version 0.0.0 means that the supervisor image was either not preloaded or a custom image was preloaded
+    if target_repository == "" or target_repository != supervisor_repository:
+        d.setVar('SUPERVISOR_VERSION','0.0.0')
+        d.setVar('PV','0.0.0')
+    else:
+        d.setVar('SUPERVISOR_VERSION', "%s" % tag_repository)
+        d.setVar('PV', "%s" % tag_repository)
+}
+
+do_install () {
+    # Generate supervisor conf
+    install -d ${D}${sysconfdir}/resin-supervisor/
+    install -m 0755 ${WORKDIR}/supervisor.conf ${D}${sysconfdir}/resin-supervisor/
+    sed -i -e 's:@SUPERVISOR_REPOSITORY@:${SUPERVISOR_REPOSITORY}:g' ${D}${sysconfdir}/resin-supervisor/supervisor.conf
+    sed -i -e 's:@LED_FILE@:${LED_FILE}:g' ${D}${sysconfdir}/resin-supervisor/supervisor.conf
+    sed -i -e 's:@SUPERVISOR_TAG@:${SUPERVISOR_TAG}:g' ${D}${sysconfdir}/resin-supervisor/supervisor.conf
+
+    install -d ${D}/resin-data
+
+    install -d ${D}${bindir}
+    install -m 0755 ${WORKDIR}/update-resin-supervisor ${D}${bindir}
+    install -m 0755 ${WORKDIR}/start-resin-supervisor ${D}${bindir}
+    install -m 0755 ${WORKDIR}/hl-balena-login ${D}${bindir}
+
+    if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
+        install -d ${D}${systemd_unitdir}/system
+
+        # Yocto gets confused if we use strange file names - so we rename it here
+        # https://bugzilla.yoctoproject.org/show_bug.cgi?id=8161
+        install -c -m 0644 ${WORKDIR}/resin-data.mount ${D}${systemd_unitdir}/system/resin\\x2ddata.mount
+
+        install -c -m 0644 ${WORKDIR}/resin-supervisor.service ${D}${systemd_unitdir}/system
+        install -c -m 0644 ${WORKDIR}/update-resin-supervisor.service ${D}${systemd_unitdir}/system
+        install -c -m 0644 ${WORKDIR}/hl-balena-login.service ${D}${systemd_unitdir}/system
+        sed -i -e 's,@BASE_BINDIR@,${base_bindir},g' \
+            -e 's,@SBINDIR@,${sbindir},g' \
+            -e 's,@BINDIR@,${bindir},g' \
+            ${D}${systemd_unitdir}/system/*.service
+    fi
+
+    install -d ${D}/usr/lib/resin-supervisor
+    install -m 0755 ${WORKDIR}/resin-supervisor-healthcheck ${D}/usr/lib/resin-supervisor/resin-supervisor-healthcheck
+}
+do_install[vardeps] += "DISTRO_FEATURES TARGET_REPOSITORY LED_FILE"
+
+do_deploy_append () {
+    echo ${SUPERVISOR_VERSION} > ${DEPLOYDIR}/VERSION
+}

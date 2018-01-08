@@ -1,0 +1,13 @@
+﻿[Unit]
+Description=SSH known_hosts/authorized_keys sync
+Requires=home-root-.ssh.mount mnt-boot.mount
+After=home-root-.ssh.mount mnt-boot.mount
+Before=etc-dropbear.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@BASE_BINDIR@/bash @BINDIR@/hl-sync-keys
+
+[Install]
+WantedBy=multi-user.target

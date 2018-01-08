@@ -1,0 +1,11 @@
+﻿[Unit]
+Description=HL HostControll
+Wants=resin-supervisor.service
+Before=resin-supervisor.service
+
+[Service]
+Type=simple
+ExecStart=@BINDIR@/socat UNIX-LISTEN:/var/run/hl-hc.sock,fork EXEC:@BINDIR@/hl-hc
+
+[Install]
+WantedBy=resin.target
