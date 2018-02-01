@@ -11,6 +11,9 @@ do_deploy_append() {
     fi
     # Enable audio (loads snd_bcm2835)
     echo "dtparam=audio=on" >> ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+
+    # Disable bluetooth on serial
+    echo "dtoverlay=pi3-disable-bt" >> ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
 }
 
 # On Raspberry Pi 3 and Raspberry Pi Zero WiFi, serial ttyS0 console is only
